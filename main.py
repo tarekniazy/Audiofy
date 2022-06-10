@@ -26,12 +26,12 @@ from sklearn.preprocessing import StandardScaler
 def filter_voice(sig, rate, gains, nband=26, lowfreq=0, highfreq=8000):
     # see gen_dataset.py's example for detial
     mel_filter_num = 20
-    filter_points, mel_freqs = get_filter_points(lowfreq, highfreq, mel_filter_num, 512, sample_rate=16000)
+    filter_points, band_freq = get_filter_points(lowfreq, highfreq, mel_filter_num, 512, sample_rate=16000)
 
-    mel_scale = get_filters(filter_points, 512,mel_filter_num)
+
 
     
-    band_freq = mel_to_freq(filter_points)
+    # band_freq = mel_to_freq(filter_points)
     band_frequency = band_freq[1:-1] # the middle point of each band
 
     b, a = iir_design(band_freq, rate)
@@ -124,6 +124,9 @@ def voice_denoise(sig,rate, model, vad, timestamp_size, numcep=26, plot=False):
 
 
     # now process the signal.
+
+
+
     filtered_sig = filter_voice(sig, rate=rate, gains=predicted_gains, nband=mfcc_feat.shape[-1])
 
 
@@ -379,6 +382,7 @@ def main():
 
     filtered_sig = voice_denoise(sig, 16000, model, vad,timestamp_size, numcep=y_train.shape[-1], plot=True) # use plot=True argument to see the gains/vad
 
+    
 
     wav.write("_nn_filtered_sample.wav", rate, np.asarray(filtered_sig * 32768, dtype=np.int16))
 
