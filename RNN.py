@@ -2,6 +2,7 @@
 from tensorflow.keras  import backend as K
 
 # from pickletools import optimize
+
 import tensorflow as tf
 
 from tensorflow.keras import *
@@ -42,7 +43,7 @@ class reset_state_after_batch(tf.keras.callbacks.Callback):
         pass
 
 
-def train(x_train, y_train, vad_train, batch_size=64, epochs=10, model_name="model.h5"):
+def train(x_train, y_train, vad_train, batch_size=64, epochs=8, model_name="model.h5"):
 
     input_feature_size = x_train.shape[-1]
     output_feature_size = y_train.shape[-1]
@@ -55,7 +56,9 @@ def train(x_train, y_train, vad_train, batch_size=64, epochs=10, model_name="mod
     x1_1 = Dropout(0.3)(x1_1)
     x1_2 = LSTM(24, return_sequences=True, stateful=True, recurrent_dropout=0.2)(x1_1)
     x1_2 = Dropout(0.3)(x1_2)
-    x = Flatten()(x1_2)
+    x1_3 = LSTM(24, return_sequences=True, stateful=True, recurrent_dropout=0.2)(x1_2)
+    x1_3 = Dropout(0.3)(x1_3)
+    x = Flatten()(x1_3)
     x = Dropout(0.3)(x)
     x = Dense(1)(x)
     vad_output = Activation("hard_sigmoid")(x)
@@ -64,12 +67,12 @@ def train(x_train, y_train, vad_train, batch_size=64, epochs=10, model_name="mod
     x_in = LSTM(64, return_sequences=True, stateful=True, recurrent_dropout=0.3)(input)
 
     # Noise spectral estimation
-    x2 = concatenate([x_in, x1_1, x1_2], axis=-1)
+    x2 = concatenate([x_in, x1_1, x1_2, x1_3], axis=-1)
     x2 = LSTM(48, return_sequences=True, stateful=True, recurrent_dropout=0.3)(x2)
     x2 = Dropout(0.3)(x2)
 
     #Spectral subtraction
-    x3 = concatenate([x_in, x2, x1_2], axis=-1)
+    x3 = concatenate([x_in, x2, x1_2, x1_3], axis=-1)
     x3 = LSTM(96, return_sequences=True, stateful=True, recurrent_dropout=0.3)(x3)
     x3 = Dropout(0.3)(x3)
     x = Flatten()(x3)
@@ -83,7 +86,7 @@ def train(x_train, y_train, vad_train, batch_size=64, epochs=10, model_name="mod
 
     model = Model(inputs=input, outputs=[x, vad_output])
     #model.compile("adam", loss=[mycost, my_crossentropy], loss_weights=[10, 0.5], metrics=[msse])  # RNNoise loss and cost
-    model.compile(optimizer=Adam(lr=0.00001), loss='mean_squared_error', metrics=[msse])
+    model.compile(optimizer=Adam(lr=0.0001), loss='mean_squared_error', metrics=[msse])
     model.summary()
 
     history = model.fit(x_train, [y_train, vad_train],
@@ -162,7 +165,7 @@ def train_gains(x_train, y_train, batch_size=64, epochs=10, model_name="model.h5
 
 
     #model.compile("adam", loss=[mycost, my_crossentropy], loss_weights=[10, 0.5], metrics=[msse])  # RNNoise loss and cost
-    Second_Concat.compile(loss='mean_squared_error',optimizer=Adam(clipvalue=0.5,lr=0.0001,clipnorm=1))
+    Second_Concat.compile(loss='mean_squared_error',optimizer=Adam(lr=0.0001,clipnorm=1))
     
 
    
