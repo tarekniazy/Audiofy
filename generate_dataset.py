@@ -6,47 +6,8 @@ import os
 import re
 
 
+
 from feature_extraction import *
-
-def iir_design(band_frequency, samplerate, order=1): # the ban frequency is the middel fre
-    b = []
-    a = []
-    fre = band_frequency / (samplerate/2)
-    for i in range(1, len(band_frequency)-1):
-        b_, a_ = signal.iirfilter(4, [fre[i] - (fre[i]-fre[i-1])/2, fre[i]+ (fre[i+1]-fre[i])/2],
-                                  btype='bandpass', output='ba')
-        # b_, a_ = signal.iirfilter(order, [fre[i-1], fre[i+1]-0.001],
-        #                            btype='bandpass', output='ba')
-        # b_, a_ = signal.cheby1(order, 1, [fre[i] - (fre[i]-fre[i-1])/2, fre[i]+ (fre[i+1]-fre[i])/2],
-        #                           btype='bandpass', output='ba')
-        b.append(b_)
-        a.append(a_)
-    return b, a
-
-
-
-def bandpass_filter_iir(sig, b_in, a_in, step, gains):
-    from scipy import signal
-    x = sig
-    y = np.zeros(step*len(gains))
-
-    state = signal.lfilter_zi(b_in, a_in)
-    g=0
-
-
-
-
-    for n in range(0, len(gains)):
-        g = max(0.6*g, gains[n])    # r=0.6 pre RNNoise paper https://arxiv.org/pdf/1709.08243.pdf
-        b = b_in*g
-        a = a_in
-        
-        filtered, state = signal.lfilter(b, a, x[n*step: min((n+1)*step, step*len(gains))], zi=state)
-        y[n*step: min((n+1)*step, step*len(gains))] = filtered
-
-
-
-    return y
 
 
 def plot_frequency_respond(b, a=None, fs=16000):
@@ -69,6 +30,7 @@ def generate_data(path,random_volume=True, vad_active_delay=0.07, vad_threshold=
     filename_label = []
     total_energy = []
     band_energy = []
+    gfcc_energy=[]
     vad = []
     files = os.listdir(path)
     for f in files:
@@ -109,7 +71,7 @@ def generate_data(path,random_volume=True, vad_active_delay=0.07, vad_threshold=
             sig = sig * np.random.uniform(0.8, 1)
 
 
-        mfcc_feat,band_eng, total_eng,gfcc_feat,_=extract_features(sig,rate)
+        mfcc_feat,band_eng, total_eng,gfcc_feat,_,gfcc_band_energy=extract_features(sig,rate)
 
 
 
@@ -126,6 +88,7 @@ def generate_data(path,random_volume=True, vad_active_delay=0.07, vad_threshold=
 
         total_energy.append(total_eng)
         band_energy.append(band_eng)
+        gfcc_energy.append(gfcc_band_energy)
         vad.append(v)
         mfcc_data.append(mfcc_feat.astype('float32'))
         gfcc_data.append(gfcc_feat.astype('float32'))
@@ -135,7 +98,7 @@ def generate_data(path,random_volume=True, vad_active_delay=0.07, vad_threshold=
 
 
         filename_label.append(filename)
-    return mfcc_data, filename_label, total_energy, vad, band_energy,gfcc_data#,bfcc_data
+    return mfcc_data, filename_label, total_energy, vad, band_energy,gfcc_data,gfcc_energy#,bfcc_data
 
     
 
@@ -151,17 +114,17 @@ if __name__ == "__main__":
 
     # clean sound, mfcc, and vad
 
-    clean_speech_mfcc, clean_file_label, total_energy, vad, clnsp_band_energy,clean_speech_gfcc = \
+    clean_speech_mfcc, clean_file_label, total_energy, vad, clnsp_band_energy,clean_speech_gfcc,clean_gfcc_energy = \
         generate_data(clean_speech_dir, vad_threshold=vad_energy_threashold)
 
     # add noise to clean speech, then generate the noise MFCC
 
-    noisy_speech_mfcc, noisy_file_label, _, _ , noisy_band_energy,noisy_speech_gfcc= \
+    noisy_speech_mfcc, noisy_file_label, _, _ , noisy_band_energy,noisy_speech_gfcc,noisy_gfcc_energy= \
         generate_data(noisy_speech_dir, vad_threshold=vad_energy_threashold)
 
     # MFCC for noise only
 
-    noise_only_mfcc, noise_only_label, _, _ , noise_band_energy,noise_only_gfcc= \
+    noise_only_mfcc, noise_only_label, _, _ , noise_band_energy,noise_only_gfcc,_= \
         generate_data(noise_dir, random_volume=False)
 
     # plt.plot(vad[5], label='voice active')
@@ -205,22 +168,12 @@ if __name__ == "__main__":
         #gains = clnsp_band_energy[idx_clnsp] / noisy_band_energy[idx_nosiy]
         gains = np.clip(gains, 0, 1)
 
-        # experimential, suppress the gains when there is no voice detected
-        #gains[vad[idx_clnsp] < 1] = gains[vad[idx_clnsp] < 1] / 10
-        # g = np.swapaxes(gains, 0, 1)
-        # plt.imshow(g, interpolation='nearest', origin='lower', aspect='auto')
-        # plt.show()
+        
+        gfcc_gains = np.sqrt(clean_gfcc_energy[idx_clnsp]/ noisy_gfcc_energy[idx_nosiy])
+        #gains = clnsp_band_energy[idx_clnsp] / noisy_band_energy[idx_nosiy]
+        gfcc_gains = np.clip(gfcc_gains, 0, 1)
 
-        # get all data needed
-
-        # if ( NULL in clean_speech_mfcc[idx_clnsp] or NULL in noisy_speech_mfcc[idx_nosiy] or NULL in clean_speech_gfcc[idx_clnsp] or NULL in noisy_speech_gfcc[idx_nosiy]):
-
-
-            # continue
-
-        # else:
-
-            # if NULL in 
+    
 
         voice_active.append(vad[idx_clnsp])
         
@@ -241,7 +194,17 @@ if __name__ == "__main__":
 
 
 
+        gains=np.concatenate((gains,gfcc_gains),axis=1)
+        
         gains_array.append(gains)
+
+        # print(gains.shape)
+
+        # print(gfcc_gains.shape)
+
+        # gains_array.append(gfcc_gains)
+
+        
 
         #>>> Uncomment to plot the MFCC image
         # mfcc_feat1 = np.swapaxes(clean_speech_mfcc[idx_clnsp], 0, 1)
@@ -253,6 +216,8 @@ if __name__ == "__main__":
         # plt.show()
 
     # save the dataset.
+
+    # print(len(gains_array))
 
     np.savez("dataset.npz", clnsp_mfcc=clnsp_mfcc, noisy_mfcc=noisy_mfcc, noise_mfcc=noise_mfcc, vad=voice_active, gains=gains_array,clnsp_gfcc=clnsp_gfcc,noise_gfcc=noise_gfcc,noisy_gfcc=noisy_gfcc)
     print("Dataset generation has been saved to:", "dataset.npz")

@@ -6,6 +6,25 @@ from utils import *
 EarQ = 9.26449
 minBW = 24.7
 
+def freq_to_gammatone(fre):
+    A = (1000*np.log(10)) / (24.7*4.37)
+    gamm = A * np.log10(1+fre*0.00437)
+    return gamm
+
+def gammatone_to_freq(gamm):
+    A = (1000*np.log(10)) / (24.7*4.37)
+    freqs = (10**(gamm/A)-1) / (0.00437)
+    return freqs
+
+def get_gammatone_points(min_freq, max_freq, nfilts):
+    fmin_mel = freq_to_gammatone(min_freq)
+    fmax_mel = freq_to_gammatone(max_freq)
+    
+    
+    mels = np.linspace(fmin_mel, fmax_mel, num=14)
+    freqs = gammatone_to_freq(mels)
+
+    return freqs
 
 def generate_center_frequencies(min_freq, max_freq, nfilts):
     """
@@ -26,6 +45,7 @@ def generate_center_frequencies(min_freq, max_freq, nfilts):
     # compute center frequencies
     cfreqs = (max_freq + c) * np.exp((m / M) * np.log(
         (min_freq + c) / (max_freq + c))) - c
+    
     return cfreqs[::-1]
 
 
@@ -123,6 +143,8 @@ def gammatone_filter_banks(nfilts=20,
 
     # computer center frequencies, convert to ERB scale and compute bandwidths
     fcs = generate_center_frequencies(low_freq, high_freq, nfilts)
+    fcs_2 = generate_center_frequencies(low_freq, high_freq, nfilts+2)
+
     ERB = width * ((fcs / EarQ)**order + minBW**order)**(1 / order)
     B = 1.019 * 2 * np.pi * ERB
 
@@ -166,7 +188,7 @@ def gammatone_filter_banks(nfilts=20,
     # apply scaler
     c = np.array(c).reshape(nfilts, 1)
     fbs = c * np.abs(fbs)
-    return fbs
+    return fbs,fcs_2
 
 
 def gfcc(sig,rate):
@@ -180,7 +202,7 @@ def gfcc(sig,rate):
     audio_fft=stft_basic(audio_windowed)
 
 
-    audio_powered=(1/512)*(np.abs(audio_fft)**2)
+    audio_abs=np.abs(audio_fft)
 
 
 
@@ -188,7 +210,7 @@ def gfcc(sig,rate):
     freq_high = 8000
 
 
-    gammatone_fbanks_mat = gammatone_filter_banks(nfilts=26,
+    gammatone_fbanks_mat,_ = gammatone_filter_banks(nfilts=12,
                                                   nfft=512,
                                                   fs=rate,
                                                   low_freq=freq_min,
@@ -196,9 +218,16 @@ def gfcc(sig,rate):
                                                   )
 
     # compute the filterbank energies
-    features = np.dot(audio_powered, gammatone_fbanks_mat.T)
+
+    audio_powered=(1/512)*(np.abs(audio_fft)**2)
+
+
+    energy = np.sum(audio_powered,1) # this stores the total energy in each frame
+    energy = np.where(energy == 0,np.finfo(float).eps,energy)
+
+    features = np.dot(audio_abs, gammatone_fbanks_mat.T)
     nonlin_rect_features = np.power(features, 1 / 3)
     gfccs = sci_dct(nonlin_rect_features, type=2, axis=1, norm='ortho')[:,:12]
 
 
-    return gfccs
+    return gfccs,features
