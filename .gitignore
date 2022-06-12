@@ -50,3 +50,4 @@ dist/**
 *.xlf
 *.nls.*.json
 *.i18n.json
+__pycache__
