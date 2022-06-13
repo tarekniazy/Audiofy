@@ -12,12 +12,21 @@ def normalize(data, n, quantize=True):
         data = np.round(data * 128)/ 128.0
     return data
 
-def iir_design(band_frequency, samplerate, order=1): # the ban frequency is the middel fre
+
+
+def iir_design(band_frequency, samplerate, order=1):
     b = []
-    a = []
-    print(band_frequency.shape)
+    a = [] 
+    # print(band_frequency.shape)
+
+    ## Calculating center frequencies from band frequencies
     fre = band_frequency / (samplerate/2)
+    ## Removing negative values
     fre = np.clip(fre, 0.001, 1)
+
+
+
+    ## Iterating on band frequencies number, and obtaining the a, and b co
 
     for i in range(1, len(band_frequency)-1):
         b_, a_ = signal.iirfilter(4, [fre[i] - (fre[i]-fre[i-1])/2, fre[i]+ (fre[i+1]-fre[i])/2],
@@ -55,17 +64,22 @@ def bandpass_filter_iir(sig, b_in, a_in, step, gains):
 
 
 def filter_voice(sig, rate, gains, nband=26, lowfreq=0, highfreq=8000):
-    # see gen_dataset.py's example for detial
+
+
+
+
+    ## Getting band frequencies for both mel and gammatone scale ##
+
     mel_filter_num = 20
     filter_points, band_freq = get_filter_points(lowfreq, highfreq, mel_filter_num, 512, sample_rate=16000)
     
-
     gammatone_points = get_gammatone_points(lowfreq, highfreq, 14)
-    # band_freq = mel_to_freq(filter_points)
 
-    # print("BAND ",band_freq)
 
-    band_frequency = band_freq[1:-1] # the middle point of each band
+
+    # band_frequency = band_freq[1:-1] 
+
+    ## Designing the filter ##
 
     b, a = iir_design(band_freq, rate)
 
@@ -75,9 +89,8 @@ def filter_voice(sig, rate, gains, nband=26, lowfreq=0, highfreq=8000):
 
     b = np.concatenate((b,b_g),axis=0)
     a = np.concatenate((a,a_g),axis=0)
-    # b.append(b_g)
-    # a.append(a_g)
-    # print("B dimension is ",np.array(b).shape)
+   
+
     step = int(0.032 * rate )
     filtered_signal = np.zeros(gains.shape[0]*step)
 

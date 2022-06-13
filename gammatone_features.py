@@ -16,6 +16,8 @@ def gammatone_to_freq(gamm):
     freqs = (10**(gamm/A)-1) / (0.00437)
     return freqs
 
+
+# Get Center Frequencies of the Gammatone points
 def get_gammatone_points(min_freq, max_freq, nfilts):
     fmin_mel = freq_to_gammatone(min_freq)
     fmax_mel = freq_to_gammatone(max_freq)

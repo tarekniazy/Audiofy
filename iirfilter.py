@@ -1,5 +1,9 @@
 import numpy as np
 
+
+
+
+
 def iirfilter(N, Wn):
     
     Wn = np.asarray(Wn)
@@ -10,32 +14,34 @@ def iirfilter(N, Wn):
     ######## Initalize z,p,k
     z = np.array([])
     m = np.arange(-N+1, N, 2)
-    # Middle value is 0 to ensure an exactly real pole
+    
+    # Find the poles of a lowpass analog prototype filter with cutoff frequency= 1 rad/s.
     p = -np.exp(1j * np.pi * m / (2 * N))
     k = 1
 
     ###############################
     fs = 2.0
-    warped = 2 * fs * np.tan(np.pi * Wn / fs)  #ANALOG FREQUENCY
 
-    try:
-        bw = float(warped[1] - warped[0])
-        wo = float(np.sqrt(warped[0] * warped[1]))
-    except IndexError as e:
-        raise ValueError('Wn must specify start and stop frequencies for bandpass filter') from e
+    ## Pre-warped frequencies and bandwidth
+    warped = 2 * fs * np.tan(np.pi * Wn / fs)
+    bw = float(warped[1] - warped[0])
+    wo = float(np.sqrt(warped[0] * warped[1]))
 
+    # Transform the analog lowpass poles,zeros, and system gain to analog bandpass 
     z, p, k = lowpass_to_bandpass(z, p, k, wo, bw)
     z, p, k = bilinear_transformation(z, p, k, fs=fs)
 
     return coefficients(z, p, k)
 
 
-
+##########################################################################
 def lowpass_to_bandpass(z, p, k, wo, bw):
 
     z = np.atleast_1d(z)
     p = np.atleast_1d(p)
 
+
+    # Get order of the tf from poles and zeroes given
     degree = relative_degree(z, p)
 
     # Scale poles and zeros to desired bandwidth
@@ -60,21 +66,27 @@ def lowpass_to_bandpass(z, p, k, wo, bw):
 
     return z_bp, p_bp, k_bp
 
+##########################################################
 
 def coefficients(z, p, k):
+
     z = np.atleast_1d(z)
     k = np.atleast_1d(k)
     if len(z.shape) > 1:
+        ## Obtaining the Numerator for the tranfer function
         temp = np.poly(z[0])
         b = np.empty((z.shape[0], z.shape[1] + 1), temp.dtype.char)
         if len(k) == 1:
             k = [k[0]] * z.shape[0]
         for i in range(z.shape[0]):
+            #### ???????
             b[i] = k[i] * np.poly(z[i])
     else:
         b = k * np.poly(z)
     a = np.atleast_1d(np.poly(p))
+    
 
+    ### MODIFY IF POSSIBLE ####
     if issubclass(b.dtype.type, np.complexfloating):
         # if complex roots are all complex conjugates, the roots are real.
         roots = np.asarray(z, complex)
@@ -97,6 +109,8 @@ def coefficients(z, p, k):
 
     return b, a
 
+
+# Converting from s-plane to the z-plane
 def bilinear_transformation(z, p, k, fs):
 
     
@@ -108,6 +122,7 @@ def bilinear_transformation(z, p, k, fs):
 
     # Any zeros that were at infinity get moved to the Nyquist frequency
     degree = relative_degree(z, p)
+    #### ????
     z_z = np.append(z_z, -np.ones(degree))
 
     # Compensate for gain change
@@ -117,8 +132,4 @@ def bilinear_transformation(z, p, k, fs):
 
 def relative_degree(z, p):
     degree = len(p) - len(z)
-    if degree < 0:
-        raise ValueError("Improper transfer function. "
-                         "Must have at least as many poles as zeros.")
-    else:
-        return degree
+    return degree

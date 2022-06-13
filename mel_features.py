@@ -16,7 +16,6 @@ def mel_to_freq(mels):
     return 700.0 * (10.0**(mels / 2595.0) - 1.0)
 
 
-
 def get_filter_points(fmin, fmax, mel_filter_num, FFT_size, sample_rate=44100):
     
     fmin_mel = freq_to_mel(fmin)
