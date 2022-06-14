@@ -2,7 +2,7 @@ import numpy as np
 import gradio as gr
 from main import *
 
-timestamp_size = 2048
+timestamp_size = 128
 model = load_model("model.h5", custom_objects={'mycost': mycost, 'msse':msse, 'my_crossentropy':my_crossentropy, 'my_accuracy':my_accuracy})
 
 def reformat_freq(sr, y):
@@ -22,30 +22,33 @@ def reformat_freq(sr, y):
     return sr, y
 
 
-def transcribe(mic, speech):
+def filter(option, speech, mic):
 
-    if mic:
+    if option == "Microphone":
+        print("HELLO")
         sr, y = mic
         rate, data = reformat_freq(sr, y)
         print("Mic ", (rate, data))
 
-    if speech:
+    if option == "Upload Audio":
+        print("HI")
         print("Recorded ", speech)
         rate, data = speech
 
-    filtered_sig = voice_denoise(data, rate, model, 0, timestamp_size, numcep=20, plot=True)
+    filtered_sig = voice_denoise(data, rate, model, timestamp_size, numcep=20, plot=True)
     output = (rate, np.asarray(filtered_sig * 32768, dtype=np.int16))
     return output
 
 
 
 gr.Interface(
-    fn=transcribe, 
+    fn=filter, 
     inputs=[
-        gr.inputs.Audio(source="microphone", type="numpy"), 
+        gr.Dropdown(["Upload Audio", "Microphone"]),
         gr.inputs.Audio(),
+        gr.inputs.Audio(source="microphone", type="numpy"), 
     ], 
     outputs= [
-        "audio",
-    ], 
-    ).launch()
+        "audio"
+    ],
+    ).launch(share=True)
