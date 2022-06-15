@@ -25,19 +25,19 @@ def reformat_freq(sr, y):
 def filter(option, speech, mic):
 
     if option == "Microphone":
-        print("HELLO")
+        if(mic is None):
+            return None, "Please record an audio"
         sr, y = mic
         rate, data = reformat_freq(sr, y)
-        print("Mic ", (rate, data))
 
     if option == "Upload Audio":
-        print("HI")
-        print("Recorded ", speech)
+        if(speech is None):
+            return None, "Please upload an audio"
         rate, data = speech
 
     filtered_sig = voice_denoise(data, rate, model, timestamp_size, numcep=20, plot=True)
     output = (rate, np.asarray(filtered_sig * 32768, dtype=np.int16))
-    return output
+    return output, "Audio filtered sucessfully"
 
 
 
@@ -49,6 +49,7 @@ gr.Interface(
         gr.inputs.Audio(source="microphone", type="numpy"), 
     ], 
     outputs= [
-        "audio"
+        "audio",
+        "textbox",
     ],
     ).launch(share=True)
